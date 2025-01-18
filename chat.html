@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Флудилка для анонимного общения</title>
+    </head>
+    <body style="background-color: #f0f0f0">
+        <h1 style="text-align: center; color: #333;">Флудилка для анонимного общения</h1>
+
+        <h3 style="text-align: center; color: #555;">Сообщения</h3>
+        <div style="border: 1px solid #ccc; border-radius: 5px; background-color: #f0f0f0; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); margin-left: auto; margin-right: auto; width: 40%;" class="messages-container"></div>
+
+        <h3 style="text-align: center; color: #555;">Отправить сообщение</h3>
+        <form style="border: 1px solid #ccc; border-radius: 5px; padding: 20px; margin-left: auto; margin-right: auto; margin-bottom: 20px; width: 33%; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);">
+            <label for="message-input-box">Введите ваше сообщение:</label>
+            <br>
+            <textarea style="width: 100%; resize: none;" name="message" rows="4" cols="50" id="message-input-box"></textarea>
+            <br>
+            <br>
+            <input type="button" value="Отправить" class="submit-button">
+        </form>
+        <p style="position: fixed; bottom: 0; right: 0;">Frontend: v1.0.0</p>
+    </body>
+</html>
+
+<script type="module">
+    const gatewayDomainUrl = 'https://d5dpqigo1d86hic5obi6.4b4k4pg5.apigw.yandexcloud.net'
+
+    const cookie = document.cookie;
+    if (cookie === undefined || cookie === null || cookie.length === 0 || cookie.indexOf("userId=") === -1) {
+        document.cookie = `userId=${generateRandomId()}`;
+    }
+
+    const messages = await fetch(gatewayDomainUrl + "/select");
+    const responseText = await messages.text()
+    const messagesJson = JSON.parse(responseText);
+
+    for (let message of messagesJson['messages']) {
+        appendMessageBlock(message['user_id'], message['sending_time'], message['message_text']);
+    }
+
+    document.getElementsByClassName("submit-button")[0].addEventListener('click', () => {
+        const message = document.getElementById("message-input-box").value;
+        if (message.length === 0) {
+            return;
+        }
+        const cookie = document.cookie;
+        if (cookie.indexOf("userId=") === -1) {
+            return;
+        }
+        const userId = cookie.substring(cookie.indexOf("userId=") + "userId".length + 1);
+        let date = new Date().toISOString();
+        date = `${date.substring(0, 10)} ${date.substring(11, 19)}`;
+
+        appendMessageBlock(userId, date, message);
+
+        document.getElementById("message-input-box").value = "";
+
+        fetch(gatewayDomainUrl + "/insert", {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                "id": uuidv4(),
+                "user_id": userId,
+                "message_text": message,
+                "sending_time": date
+            }),
+            redirect: 'follow'
+        }).then((r) => {
+            if (r.redirected) {
+                window.location.href = r.url
+            }
+        });
+    });
+
+    function appendMessageBlock(userId, date, message) {
+        const messageBlock = document.createElement("div");
+        messageBlock.style = "border: 1px solid #bbb; border-radius: 10px; margin: 10px;"
+        const userData = document.createElement("p");
+        userData.textContent = `Пользователь ${userId} - ${date}`;
+        userData.style = "text-align: center; color: #777;"
+        const text = document.createElement("p");
+        text.textContent = message;
+        text.style = "padding-left: 20px; padding-right: 20px; overflow-wrap: break-word;"
+        
+        messageBlock.appendChild(userData);
+        messageBlock.appendChild(text);
+        document.getElementsByClassName("messages-container")[0].appendChild(messageBlock);
+    }
+
+    function generateRandomId() {
+        let characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let id = '';
+        for (let i = 0; i < 10; i++) {
+            id += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return id;
+    }
+
+    function uuidv4() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+            .replace(/[xy]/g, function (c) {
+                const r = Math.random() * 16 | 0,
+                    v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+    }
+</script>
+
